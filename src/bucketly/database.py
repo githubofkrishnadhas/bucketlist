@@ -38,6 +38,28 @@ def init_db():
             )
         if "completed_at" not in columns:
             conn.execute("ALTER TABLE bucket_items ADD COLUMN completed_at TEXT")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_profile (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                username TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL DEFAULT '',
+                contact_number TEXT NOT NULL DEFAULT '',
+                email TEXT NOT NULL DEFAULT '',
+                is_public INTEGER NOT NULL DEFAULT 0,
+                avatar_id TEXT NOT NULL DEFAULT 'compass',
+                updated_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                feedback_type TEXT NOT NULL,
+                name TEXT NOT NULL DEFAULT '',
+                email TEXT NOT NULL DEFAULT '',
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
         conn.commit()
 
 
@@ -93,4 +115,48 @@ def update_status(item_id, status):
 def delete_item(item_id):
     with get_connection() as conn:
         conn.execute("DELETE FROM bucket_items WHERE id = ?", (item_id,))
+        conn.commit()
+
+
+def get_profile():
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM user_profile WHERE id = 1").fetchone()
+        if row:
+            return dict(row)
+    return {
+        "username": "",
+        "name": "",
+        "contact_number": "",
+        "email": "",
+        "is_public": 0,
+        "avatar_id": "compass",
+    }
+
+
+def save_profile(username, name, contact_number, email, is_public, avatar_id):
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO user_profile
+            (id, username, name, contact_number, email, is_public, avatar_id, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime'))
+            ON CONFLICT(id) DO UPDATE SET
+                username = excluded.username,
+                name = excluded.name,
+                contact_number = excluded.contact_number,
+                email = excluded.email,
+                is_public = excluded.is_public,
+                avatar_id = excluded.avatar_id,
+                updated_at = excluded.updated_at""",
+            (username, name, contact_number, email, int(is_public), avatar_id),
+        )
+        conn.commit()
+
+
+def save_feedback(feedback_type, name, email, message):
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO feedback (feedback_type, name, email, message, created_at)
+            VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime'))""",
+            (feedback_type, name, email, message),
+        )
         conn.commit()
